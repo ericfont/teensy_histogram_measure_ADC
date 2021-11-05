@@ -119,7 +119,7 @@ void loop() {
 }
 
 void printRightJustifiedUnsignedInt(uint32_t value) {
-  const uint32_t maxDigits = 10;
+  const int32_t maxDigits = 10;
   uint32_t digits[maxDigits];
   int32_t digitIndex = 0;
   while( digitIndex < maxDigits ) {
