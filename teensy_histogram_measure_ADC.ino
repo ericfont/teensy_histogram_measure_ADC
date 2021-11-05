@@ -3,11 +3,14 @@
 
 ADC *adc = new ADC(); // adc object
 
-const uint32_t analogReadBitDepth = 12;
-const uint32_t analogReadMax = (1 << analogReadBitDepth);
-const uint32_t analogReadAveragingNum = 32;
+const uint32_t analogReadBitDepth0 = 12;
+const uint32_t analogReadBitDepth1 = 12;
+const uint32_t analogReadMax0 = (1 << analogReadBitDepth0);
+const uint32_t analogReadMax1 = (1 << analogReadBitDepth1);
+const uint32_t analogReadAveragingNum0 = 4;
+const uint32_t analogReadAveragingNum1 = 4;
+const uint32_t analogReadPin0 = A0; // ADC0 or ADC1
 const uint32_t analogReadPin1 = A1; // ADC0 or ADC1
-const uint32_t analogReadPin2 = A0; // ADC0 or ADC1
 
 const uint32_t interruptPin = 0;
 volatile uint32_t triggerReset = true; // start true so initialize histogram & stats
@@ -25,22 +28,26 @@ void interruptPressed() {
 }
 
 void setup() {  
+  pinMode(analogReadPin0, INPUT);
   pinMode(analogReadPin1, INPUT);
-  pinMode(analogReadPin2, INPUT);
   pinMode(interruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interruptPin), interruptPressed, FALLING);
   
   Serial.begin(12000000);//115200);
-  Serial.print("analog analogReadBitDepth is: ");
-  Serial.println(analogReadBitDepth);
-  Serial.print("analog analogReadAveragingNum is: ");
-  Serial.println(analogReadAveragingNum);
+  Serial.print("analog analogReadBitDepth0 is: ");
+  Serial.println(analogReadBitDepth0);
+  Serial.print("analog analogReadBitDepth1 is: ");
+  Serial.println(analogReadBitDepth1);
+  Serial.print("analog analogReadAveragingNum0 is: ");
+  Serial.println(analogReadAveragingNum0);
+  Serial.print("analog analogReadAveragingNum1 is: ");
+  Serial.println(analogReadAveragingNum1);
 
-  adc->adc0->setAveraging(analogReadAveragingNum); // set number of averages
-  adc->adc1->setAveraging(analogReadAveragingNum); // set number of averages
+  adc->adc0->setAveraging(analogReadAveragingNum0); // set number of averages
+  adc->adc1->setAveraging(analogReadAveragingNum1); // set number of averages
   
-  adc->adc0->setResolution(analogReadBitDepth); // set bits of resolution
-  adc->adc1->setResolution(analogReadBitDepth); // set bits of resolution
+  adc->adc0->setResolution(analogReadBitDepth0); // set bits of resolution
+  adc->adc1->setResolution(analogReadBitDepth1); // set bits of resolution
 
   adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
   adc->adc1->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
@@ -69,8 +76,8 @@ void setup() {
   adc->adc1->wait_for_cal(); // waits until calibration is finished and writes the corresponding registers
 }
 
-volatile uint64_t measurementHistogram0[analogReadMax];
-volatile uint64_t measurementHistogram1[analogReadMax];
+volatile uint64_t measurementHistogram0[analogReadMax0];
+volatile uint64_t measurementHistogram1[analogReadMax1];
 
 uint64_t nMeasurements0;
 uint64_t nMeasurements1;
@@ -90,9 +97,11 @@ void loop() {
     
     runNumber += 1;
     
-    // reset histogram array
-    for( uint32_t i = 0; i < analogReadMax; i++ ) {
+    // reset histogram arrays
+    for( uint32_t i = 0; i < analogReadMax0; i++ ) {
       measurementHistogram0[i] = 0;
+    }
+    for( uint32_t i = 0; i < analogReadMax1; i++ ) {
       measurementHistogram1[i] = 0;
     }
   
@@ -107,8 +116,8 @@ void loop() {
   
   uint32_t microsPrintFrameStartTime = micros();
   
-  adc->adc0->startContinuous(analogReadPin1);
-  adc->adc1->startContinuous(analogReadPin2);
+  adc->adc0->startContinuous(analogReadPin0);
+  adc->adc1->startContinuous(analogReadPin1);
   
   delay (100); // take measurements for a while
   
@@ -136,6 +145,8 @@ void loop() {
     volatile uint64_t *measurementHistogram = ( (adc_number == 0) ? measurementHistogram0 : measurementHistogram1);
     uint64_t nMeasurementsPerPrintFrame = ( (adc_number == 0) ? nMeasurements0PerPrintFrame : nMeasurements1PerPrintFrame);
     uint64_t nMeasurements = ( (adc_number == 0) ? nMeasurements0 : nMeasurements1);
+    uint32_t analogReadMax = ( (adc_number == 0) ? analogReadMax0 : analogReadMax1);
+    uint32_t analogReadBitDepth = ( (adc_number == 0) ? analogReadBitDepth0 : analogReadBitDepth1);
 
     Serial.print("ADC");
     Serial.print(adc_number);
