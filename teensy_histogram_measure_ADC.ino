@@ -37,7 +37,7 @@ void setup() {
   adc->adc0->setAveraging(analogReadAveragingNum); // set number of averages
   adc->adc0->setResolution(analogReadBitDepth); // set bits of resolution
 
-  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::HIGH_SPEED); // change the conversion speed
+  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
   /* For Teensy 4:
   VERY_LOW_SPEED: is the lowest possible sampling speed (+22 ADCK, 24 in total).
   LOW_SPEED adds +18 ADCK, 20 in total.
@@ -61,7 +61,7 @@ void setup() {
   adc->adc0->wait_for_cal(); // waits until calibration is finished and writes the corresponding registers
 }
 
-uint32_t measurmentHistogram[analogReadMax];
+volatile uint64_t measurmentHistogram[analogReadMax];
 uint32_t runNumber = 0;
 uint32_t minimum;
 uint32_t maximum;
@@ -93,11 +93,11 @@ void loop() {
   adc->adc0->enableInterrupts(adc0_isr);
   adc->adc0->startContinuous(analogReadPin);
   
-  delay (250); // take measurements for a while
+  delay (100); // take measurements for a while
   
   adc->adc0->stopContinuous();
   adc->adc0->disableInterrupts();
-  nMeasurements += nMeasurementsPerPrintFrame;  
+  nMeasurements += (uint64_t) nMeasurementsPerPrintFrame;  
   uint32_t microsPrintFrameDuration = micros() - microsPrintFrameStartTime;
 
   // end of taking measurements, now time to print summary statistics
@@ -143,7 +143,7 @@ void loop() {
     printRightJustifiedUnsignedInt(measurmentHistogram[i]);
     float percentOfTotal = (float) measurmentHistogram[i] * 100.0f / nMeasurements;
     Serial.print(' ');
-    for( int bars = measurmentHistogram[i] * 100 / nMeasurements; bars >= 0; bars-- ) {
+    for( int bars = (int64_t) measurmentHistogram[i] * 100 / nMeasurements; bars >= 0; bars-- ) {
       Serial.write('=');
     }
     Serial.print(' ');
