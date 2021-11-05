@@ -1,7 +1,12 @@
+#include <ADC.h>
+#include <ADC_util.h>
+
+ADC *adc = new ADC(); // adc object
+
 const uint32_t analogReadBitDepth = 12;
 const uint32_t analogReadMax = (1 << analogReadBitDepth);
 const uint32_t analogReadAveragingNum = 32;
-const uint32_t analogReadPin = 14;
+const uint32_t analogReadPin = A0; // ADC0 or ADC1
 
 const uint32_t interruptPin = 0;
 volatile uint32_t triggerReset = true; // start true so initialize histogram & stats
@@ -19,9 +24,6 @@ void interruptPressed() {
 }
 
 void setup() {  
-  analogReadResolution(analogReadBitDepth);
-  analogReadAveraging(analogReadAveragingNum);
-
   pinMode(analogReadPin, INPUT);
   pinMode(interruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interruptPin), interruptPressed, FALLING);
@@ -31,6 +33,32 @@ void setup() {
   Serial.println(analogReadBitDepth);
   Serial.print("analog analogReadAveragingNum is: ");
   Serial.println(analogReadAveragingNum);
+
+  adc->adc0->setAveraging(analogReadAveragingNum); // set number of averages
+  adc->adc0->setResolution(analogReadBitDepth); // set bits of resolution
+
+  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
+  /* For Teensy 4:
+  VERY_LOW_SPEED: is the lowest possible sampling speed (+22 ADCK, 24 in total).
+  LOW_SPEED adds +18 ADCK, 20 in total.
+  LOW_MED_SPEED adds +14, 16 in total.
+  MED_SPEED adds +10, 12 in total.
+  MED_HIGH_SPEED adds +6 ADCK, 8 in total.
+  HIGH_SPEED adds +4 ADCK, 6 in total.
+  HIGH_VERY_HIGH_SPEED adds +2 ADCK, 4 in total
+  VERY_HIGH_SPEED is the highest possible sampling speed (0 ADCK added, 2 in total).
+  */
+
+  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED); // change the sampling speed
+  /* For Teensy 4:
+  VERY_LOW_SPEED is guaranteed to be the lowest possible speed within specs (higher than 4 MHz).
+  LOW_SPEED is equal to VERY_LOW_SPEED
+  MED_SPEED is always >= ADC_LOW_SPEED and <= ADC_HIGH_SPEED.
+  HIGH_SPEED is guaranteed to be the highest possible speed within specs (lower or eq than 40 MHz).
+  VERY_HIGH_SPEED is equal to HIGH_SPEED
+  */
+
+  adc->adc0->wait_for_cal(); // waits until calibration is finished and writes the corresponding registers
 }
 
 uint32_t measurmentHistogram[analogReadMax];
@@ -67,7 +95,7 @@ void loop() {
 
   // take measurements for a while
   while( !triggerReset && millis() < millisNextPrintFrame) {
-    measurement = analogRead(analogReadPin);
+    measurement = adc->adc0->analogRead(analogReadPin);
     measurmentHistogram[measurement] += 1;
     summation += measurement;
     
