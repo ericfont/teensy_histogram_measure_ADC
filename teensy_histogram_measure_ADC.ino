@@ -63,12 +63,12 @@ void setup() {
 
 uint32_t measurmentHistogram[analogReadMax];
 uint32_t runNumber = 0;
-uint32_t summation;
 uint32_t minimum;
 uint32_t maximum;
 uint32_t nMeasurements;
 uint32_t measurement;
 uint32_t millisStartTimestamp;
+uint64_t summation;
 
 void loop() {
 
@@ -95,8 +95,8 @@ void loop() {
   // take measurements for a while
   for( uint32_t i=0; i<nMeasurementsPerPrintFrame; i++ ) {
     measurement = adc->adc0->analogRead(analogReadPin);
-    measurmentHistogram[measurement] += 1;
     summation += measurement;
+    measurmentHistogram[measurement] += 1;
     
     if( measurement < minimum )
       minimum = measurement;
@@ -120,7 +120,12 @@ void loop() {
   Serial.print(" kHz sampling rate)");
   Serial.println();
 
+  float mean = (float) summation / nMeasurements;
+  float sumofsquares = 0;
+  
   for( uint32_t i=minimum; i<= maximum; i++) {
+    float differenceFromMean = (float) i - mean;
+    sumofsquares += (float) measurmentHistogram[i] * (differenceFromMean * differenceFromMean);
     Serial.print("bin[");
     Serial.print(i);
     Serial.print("] = ");
@@ -136,9 +141,16 @@ void loop() {
   }
   Serial.println("normalized scale:       0%       10%       20%       30%       40%       50%       60%       70%       80%       90%      100%");
   
-  float mean = (float) summation / nMeasurements;
-  Serial.print("mean: ");
+  Serial.print("mean:   ");
   Serial.println(mean, 6);
+
+  float variance = sumofsquares / (float) nMeasurements;  
+  Serial.print("var:    ");
+  Serial.println(variance, 6);
+
+  float standardDeviation = sqrt(variance);
+  Serial.print("stdDev: ");
+  Serial.println(standardDeviation, 6);
 
   Serial.println();
   Serial.println();
