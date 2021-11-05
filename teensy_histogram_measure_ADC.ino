@@ -6,7 +6,8 @@ ADC *adc = new ADC(); // adc object
 const uint32_t analogReadBitDepth = 12;
 const uint32_t analogReadMax = (1 << analogReadBitDepth);
 const uint32_t analogReadAveragingNum = 32;
-const uint32_t analogReadPin = A0; // ADC0 or ADC1
+const uint32_t analogReadPin1 = A1; // ADC0 or ADC1
+const uint32_t analogReadPin2 = A0; // ADC0 or ADC1
 
 const uint32_t interruptPin = 0;
 volatile uint32_t triggerReset = true; // start true so initialize histogram & stats
@@ -24,7 +25,8 @@ void interruptPressed() {
 }
 
 void setup() {  
-  pinMode(analogReadPin, INPUT);
+  pinMode(analogReadPin1, INPUT);
+  pinMode(analogReadPin2, INPUT);
   pinMode(interruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interruptPin), interruptPressed, FALLING);
   
@@ -35,9 +37,13 @@ void setup() {
   Serial.println(analogReadAveragingNum);
 
   adc->adc0->setAveraging(analogReadAveragingNum); // set number of averages
+  adc->adc1->setAveraging(analogReadAveragingNum); // set number of averages
+  
   adc->adc0->setResolution(analogReadBitDepth); // set bits of resolution
+  adc->adc1->setResolution(analogReadBitDepth); // set bits of resolution
 
   adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
+  adc->adc1->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
   /* For Teensy 4:
   VERY_LOW_SPEED: is the lowest possible sampling speed (+22 ADCK, 24 in total).
   LOW_SPEED adds +18 ADCK, 20 in total.
@@ -50,6 +56,7 @@ void setup() {
   */
 
   adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED); // change the sampling speed
+  adc->adc1->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED); // change the sampling speed
   /* For Teensy 4:
   VERY_LOW_SPEED is guaranteed to be the lowest possible speed within specs (higher than 4 MHz).
   LOW_SPEED is equal to VERY_LOW_SPEED
@@ -59,117 +66,152 @@ void setup() {
   */
 
   adc->adc0->wait_for_cal(); // waits until calibration is finished and writes the corresponding registers
+  adc->adc1->wait_for_cal(); // waits until calibration is finished and writes the corresponding registers
 }
 
-volatile uint64_t measurmentHistogram[analogReadMax];
+volatile uint64_t measurementHistogram0[analogReadMax];
+volatile uint64_t measurementHistogram1[analogReadMax];
+
+uint64_t nMeasurements0;
+uint64_t nMeasurements1;
+
 uint32_t runNumber = 0;
-uint32_t minimum;
-uint32_t maximum;
-uint64_t nMeasurements;
-uint32_t measurement;
 uint32_t millisStartTimestamp;
-volatile uint32_t nMeasurementsPerPrintFrame;
+volatile uint32_t nMeasurements0PerPrintFrame;
+volatile uint32_t nMeasurements1PerPrintFrame;
 
 void loop() {
 
   if (triggerReset) {
     triggerReset = false;
     
-    minimum = (1 << analogReadBitDepth);
-    maximum = 0;
-    nMeasurements = 0;
+    nMeasurements0 = 0;
+    nMeasurements1 = 0;
+    
     runNumber += 1;
     
     // reset histogram array
     for( uint32_t i = 0; i < analogReadMax; i++ ) {
-      measurmentHistogram[i] = 0;
+      measurementHistogram0[i] = 0;
+      measurementHistogram1[i] = 0;
     }
   
     millisStartTimestamp = millis();
   }
 
-  nMeasurementsPerPrintFrame = 0;
-  uint32_t microsPrintFrameStartTime = micros();
+  nMeasurements0PerPrintFrame = 0;
+  nMeasurements1PerPrintFrame = 0;
+  
   adc->adc0->enableInterrupts(adc0_isr);
-  adc->adc0->startContinuous(analogReadPin);
+  adc->adc1->enableInterrupts(adc1_isr);
+  
+  uint32_t microsPrintFrameStartTime = micros();
+  
+  adc->adc0->startContinuous(analogReadPin1);
+  adc->adc1->startContinuous(analogReadPin2);
   
   delay (100); // take measurements for a while
   
   adc->adc0->stopContinuous();
-  adc->adc0->disableInterrupts();
-  nMeasurements += (uint64_t) nMeasurementsPerPrintFrame;  
+  adc->adc1->stopContinuous();
+  
   uint32_t microsPrintFrameDuration = micros() - microsPrintFrameStartTime;
+  
+  adc->adc0->disableInterrupts();
+  adc->adc1->disableInterrupts();  
+  
+  nMeasurements0 += (uint64_t) nMeasurements0PerPrintFrame;
+  nMeasurements1 += (uint64_t) nMeasurements1PerPrintFrame;  
 
   // end of taking measurements, now time to print summary statistics
   Serial.print("run #");
   Serial.print(runNumber);
   Serial.print(" cumulative histogram after ");
   Serial.print((float) millis() / 1000);
-  Serial.print(" seconds and ");
-  Serial.print(nMeasurements);
-  Serial.print(" measurements (");
-  Serial.print((float) nMeasurementsPerPrintFrame * 1000.0f / microsPrintFrameDuration);
-  Serial.print(" kHz sampling rate)");
+  Serial.print(" seconds.");
   Serial.println();
 
   // calculate stats
-  uint64_t summation = 0;
-  for( uint32_t i = 0; i < analogReadMax; i++) {
-    if( measurmentHistogram[i] > 0 ) {
-      summation += measurmentHistogram[i] * i;
+  for( uint32_t adc_number = 0; adc_number < 2; adc_number++ ) {
+    volatile uint64_t *measurementHistogram = ( (adc_number == 0) ? measurementHistogram0 : measurementHistogram1);
+    uint64_t nMeasurementsPerPrintFrame = ( (adc_number == 0) ? nMeasurements0PerPrintFrame : nMeasurements1PerPrintFrame);
+    uint64_t nMeasurements = ( (adc_number == 0) ? nMeasurements0 : nMeasurements1);
+
+    Serial.print("ADC");
+    Serial.print(adc_number);
+    Serial.print(": ");
+    Serial.print(nMeasurements);
+    Serial.print(" # measurements (");
+    Serial.print((float) nMeasurementsPerPrintFrame * 1000.0f / microsPrintFrameDuration);
+    Serial.print("kHz)");
   
-      if( i < minimum )
-        minimum = i;
-        
-      if( i > maximum )
-        maximum = i;
+    uint32_t minimum = (1 << analogReadBitDepth);    
+    uint32_t maximum = 0;    
+    uint64_t summation = 0;
+    
+    for( uint32_t i = 0; i < analogReadMax; i++) {
+      if( measurementHistogram[i] > 0 ) {        
+        summation += measurementHistogram[i] * i;
+    
+        if( i < minimum )
+          minimum = i;
+          
+        if( i > maximum )
+          maximum = i;
+      }
     }
-  }
-  float mean = (float) summation / nMeasurements;
-  Serial.print("range of ");
-  Serial.print(maximum - minimum);
-  Serial.print(" from ");
-  Serial.print(minimum);
-  Serial.print(" to ");
-  Serial.println(maximum);
-  
-  float sumofsquares = 0;  
-  for( uint32_t i=minimum; i<= maximum; i++) {
-    float differenceFromMean = (float) i - mean;
-    sumofsquares += (float) measurmentHistogram[i] * (differenceFromMean * differenceFromMean);
-    Serial.print("bin[");
-    Serial.print(i);
-    Serial.print("] = ");
-    printRightJustifiedUnsignedInt(measurmentHistogram[i]);
-    float percentOfTotal = (float) measurmentHistogram[i] * 100.0f / nMeasurements;
-    Serial.print(' ');
-    for( int bars = (int64_t) measurmentHistogram[i] * 100 / nMeasurements; bars >= 0; bars-- ) {
-      Serial.write('=');
+    float mean = (float) summation / nMeasurements;
+    Serial.print("range of ");
+    Serial.print(maximum - minimum);
+    Serial.print(" from ");
+    Serial.print(minimum);
+    Serial.print(" to ");
+    Serial.println(maximum);
+    
+    float sumofsquares = 0;  
+    for( uint32_t i=minimum; i<= maximum; i++) {
+      float differenceFromMean = (float) i - mean;
+      sumofsquares += (float) measurementHistogram[i] * (differenceFromMean * differenceFromMean);
+      Serial.print("bin[");
+      Serial.print(i);
+      Serial.print("] = ");
+      printRightJustifiedUnsignedInt(measurementHistogram[i]);
+      float percentOfTotal = (float) measurementHistogram[i] * 100.0f / nMeasurements;
+      Serial.print(' ');
+      for( int bars = (int64_t) measurementHistogram[i] * 100 / nMeasurements; bars >= 0; bars-- ) {
+        Serial.write('=');
+      }
+      Serial.print(' ');
+      Serial.print(percentOfTotal);
+      Serial.println('%');
     }
-    Serial.print(' ');
-    Serial.print(percentOfTotal);
-    Serial.println('%');
-  }
-  Serial.println("normalized scale:       0%       10%       20%       30%       40%       50%       60%       70%       80%       90%      100%");
+    Serial.println("normalized scale:       0%       10%       20%       30%       40%       50%       60%       70%       80%       90%      100%");
+    
+    Serial.print("mean:   ");
+    Serial.println(mean, 6);
   
-  Serial.print("mean:   ");
-  Serial.println(mean, 6);
-
-  float variance = sumofsquares / (float) nMeasurements;  
-  Serial.print("var:    ");
-  Serial.println(variance, 6);
-
-  float standardDeviation = sqrt(variance);
-  Serial.print("stdDev: ");
-  Serial.println(standardDeviation, 6);
-
-  Serial.println();
+    float variance = sumofsquares / (float) nMeasurements;  
+    Serial.print("var:    ");
+    Serial.println(variance, 6);
+  
+    float standardDeviation = sqrt(variance);
+    Serial.print("stdDev: ");
+    Serial.println(standardDeviation, 6);
+  
+    Serial.println();
+  }
 }
 
 void adc0_isr(void) {
-  nMeasurementsPerPrintFrame++;
+  nMeasurements0PerPrintFrame++;
   int measurement = adc->adc0->analogReadContinuous();
-  measurmentHistogram[measurement] += 1;
+  measurementHistogram0[measurement] += 1;
+}
+
+void adc1_isr(void) {
+  nMeasurements1PerPrintFrame++;
+  int measurement = adc->adc1->analogReadContinuous();
+  measurementHistogram1[measurement] += 1;
 }
 
 void printRightJustifiedUnsignedInt(uint32_t value) {
