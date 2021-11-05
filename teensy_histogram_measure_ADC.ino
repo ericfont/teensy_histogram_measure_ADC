@@ -37,7 +37,7 @@ void setup() {
   adc->adc0->setAveraging(analogReadAveragingNum); // set number of averages
   adc->adc0->setResolution(analogReadBitDepth); // set bits of resolution
 
-  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
+  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::HIGH_SPEED); // change the conversion speed
   /* For Teensy 4:
   VERY_LOW_SPEED: is the lowest possible sampling speed (+22 ADCK, 24 in total).
   LOW_SPEED adds +18 ADCK, 20 in total.
@@ -63,7 +63,7 @@ void setup() {
 
 uint32_t measurmentHistogram[analogReadMax];
 uint32_t runNumber = 0;
-uint64_t summation;
+uint32_t summation;
 uint32_t minimum;
 uint32_t maximum;
 uint32_t nMeasurements;
@@ -89,12 +89,11 @@ void loop() {
     millisStartTimestamp = millis();
   }
 
-  static uint32_t millisPerPrintFrame = 500;
-  uint32_t millisNextPrintFrame = millis() + millisPerPrintFrame;
-  uint32_t nMeasurementsThisPrintFrame = 0;
+  uint32_t microsStartPrintFrame = micros();
+  uint32_t nMeasurementsPerPrintFrame = 1000;
 
   // take measurements for a while
-  while( !triggerReset && millis() < millisNextPrintFrame) {
+  for( uint32_t i=0; i<nMeasurementsPerPrintFrame; i++ ) {
     measurement = adc->adc0->analogRead(analogReadPin);
     measurmentHistogram[measurement] += 1;
     summation += measurement;
@@ -104,22 +103,20 @@ void loop() {
       
     if( measurement > maximum )
       maximum = measurement;
-
-    nMeasurementsThisPrintFrame++;
   }
-  nMeasurements += nMeasurementsThisPrintFrame;
+  nMeasurements += nMeasurementsPerPrintFrame;
   
-  uint32_t millisDuration = millis() - millisStartTimestamp;
+  uint32_t microsPrintFrameDuration = micros() - microsStartPrintFrame;
 
   // end of taking measurements, now time to print summary statistics
   Serial.print("run #");
   Serial.print(runNumber);
   Serial.print(" cumulative histogram after ");
-  Serial.print((float) millisDuration / 1000);
+  Serial.print((float) millis() / 1000);
   Serial.print(" seconds and ");
   Serial.print(nMeasurements);
   Serial.print(" measurements (");
-  Serial.print((float) nMeasurementsThisPrintFrame / millisPerPrintFrame);
+  Serial.print((float) nMeasurementsPerPrintFrame * 1000.0f / microsPrintFrameDuration);
   Serial.print(" kHz sampling rate)");
   Serial.println();
 
