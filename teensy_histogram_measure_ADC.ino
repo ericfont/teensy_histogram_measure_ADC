@@ -7,10 +7,31 @@ const uint32_t analogReadBitDepth0 = 12;
 const uint32_t analogReadBitDepth1 = 12;
 const uint32_t analogReadMax0 = (1 << analogReadBitDepth0);
 const uint32_t analogReadMax1 = (1 << analogReadBitDepth1);
-const uint32_t analogReadAveragingNum0 = 4;
-const uint32_t analogReadAveragingNum1 = 4;
+const uint32_t analogReadAveragingNum0 = 32;
+const uint32_t analogReadAveragingNum1 = 32;
 const uint32_t analogReadPin0 = A0; // ADC0 or ADC1
 const uint32_t analogReadPin1 = A1; // ADC0 or ADC1
+
+const enum ADC_settings::ADC_CONVERSION_SPEED conversionSpeeds[2] = {ADC_CONVERSION_SPEED::VERY_HIGH_SPEED, ADC_CONVERSION_SPEED::VERY_HIGH_SPEED};
+  /* For Teensy 4:
+  VERY_LOW_SPEED: is the lowest possible sampling speed (+22 ADCK, 24 in total).
+  LOW_SPEED adds +18 ADCK, 20 in total.
+  LOW_MED_SPEED adds +14, 16 in total.
+  MED_SPEED adds +10, 12 in total.
+  MED_HIGH_SPEED adds +6 ADCK, 8 in total.
+  HIGH_SPEED adds +4 ADCK, 6 in total.
+  HIGH_VERY_HIGH_SPEED adds +2 ADCK, 4 in total
+  VERY_HIGH_SPEED is the highest possible sampling speed (0 ADCK added, 2 in total).
+  */
+  
+const enum ADC_settings::ADC_SAMPLING_SPEED samplingSpeeds[2] = {ADC_SAMPLING_SPEED::VERY_HIGH_SPEED, ADC_SAMPLING_SPEED::VERY_HIGH_SPEED};
+  /* For Teensy 4:
+  VERY_LOW_SPEED is guaranteed to be the lowest possible speed within specs (higher than 4 MHz).
+  LOW_SPEED is equal to VERY_LOW_SPEED
+  MED_SPEED is always >= ADC_LOW_SPEED and <= ADC_HIGH_SPEED.
+  HIGH_SPEED is guaranteed to be the highest possible speed within specs (lower or eq than 40 MHz).
+  VERY_HIGH_SPEED is equal to HIGH_SPEED
+  */
 
 const uint32_t interruptPin = 0;
 volatile uint32_t triggerReset = true; // start true so initialize histogram & stats
@@ -34,14 +55,6 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(interruptPin), interruptPressed, FALLING);
   
   Serial.begin(12000000);//115200);
-  Serial.print("analog analogReadBitDepth0 is: ");
-  Serial.println(analogReadBitDepth0);
-  Serial.print("analog analogReadBitDepth1 is: ");
-  Serial.println(analogReadBitDepth1);
-  Serial.print("analog analogReadAveragingNum0 is: ");
-  Serial.println(analogReadAveragingNum0);
-  Serial.print("analog analogReadAveragingNum1 is: ");
-  Serial.println(analogReadAveragingNum1);
 
   adc->adc0->setAveraging(analogReadAveragingNum0); // set number of averages
   adc->adc1->setAveraging(analogReadAveragingNum1); // set number of averages
@@ -49,28 +62,11 @@ void setup() {
   adc->adc0->setResolution(analogReadBitDepth0); // set bits of resolution
   adc->adc1->setResolution(analogReadBitDepth1); // set bits of resolution
 
-  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
-  adc->adc1->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
-  /* For Teensy 4:
-  VERY_LOW_SPEED: is the lowest possible sampling speed (+22 ADCK, 24 in total).
-  LOW_SPEED adds +18 ADCK, 20 in total.
-  LOW_MED_SPEED adds +14, 16 in total.
-  MED_SPEED adds +10, 12 in total.
-  MED_HIGH_SPEED adds +6 ADCK, 8 in total.
-  HIGH_SPEED adds +4 ADCK, 6 in total.
-  HIGH_VERY_HIGH_SPEED adds +2 ADCK, 4 in total
-  VERY_HIGH_SPEED is the highest possible sampling speed (0 ADCK added, 2 in total).
-  */
+  adc->adc0->setConversionSpeed(conversionSpeeds[0]); // change the conversion speed
+  adc->adc1->setConversionSpeed(conversionSpeeds[1]); // change the conversion speed
 
-  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED); // change the sampling speed
-  adc->adc1->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED); // change the sampling speed
-  /* For Teensy 4:
-  VERY_LOW_SPEED is guaranteed to be the lowest possible speed within specs (higher than 4 MHz).
-  LOW_SPEED is equal to VERY_LOW_SPEED
-  MED_SPEED is always >= ADC_LOW_SPEED and <= ADC_HIGH_SPEED.
-  HIGH_SPEED is guaranteed to be the highest possible speed within specs (lower or eq than 40 MHz).
-  VERY_HIGH_SPEED is equal to HIGH_SPEED
-  */
+  adc->adc0->setSamplingSpeed(samplingSpeeds[0]); // change the sampling speed
+  adc->adc1->setSamplingSpeed(samplingSpeeds[1]); // change the sampling speed
 
   adc->adc0->wait_for_cal(); // waits until calibration is finished and writes the corresponding registers
   adc->adc1->wait_for_cal(); // waits until calibration is finished and writes the corresponding registers
@@ -139,6 +135,7 @@ void loop() {
   Serial.print((float) millis() / 1000);
   Serial.print(" seconds.");
   Serial.println();
+  Serial.println();
 
   // calculate stats
   for( uint32_t adc_number = 0; adc_number < 2; adc_number++ ) {
@@ -147,14 +144,24 @@ void loop() {
     uint64_t nMeasurements = ( (adc_number == 0) ? nMeasurements0 : nMeasurements1);
     uint32_t analogReadMax = ( (adc_number == 0) ? analogReadMax0 : analogReadMax1);
     uint32_t analogReadBitDepth = ( (adc_number == 0) ? analogReadBitDepth0 : analogReadBitDepth1);
+    uint32_t analogReadAveragingNum = ( (adc_number == 0) ? analogReadAveragingNum0 : analogReadAveragingNum1);
 
     Serial.print("ADC");
     Serial.print(adc_number);
     Serial.print(": ");
+    Serial.print("BitDepth=");
+    Serial.print(analogReadBitDepth);
+    Serial.print(", averaging=");
+    Serial.print(analogReadAveragingNum);
+    Serial.print(", nMeasurements=");
     Serial.print(nMeasurements);
-    Serial.print(" # measurements (");
+    Serial.print(" @");
     Serial.print((float) nMeasurementsPerPrintFrame * 1000.0f / microsPrintFrameDuration);
-    Serial.print("kHz)");
+    Serial.print("kHz (ADC_CONVERSION_SPEED=");
+    Serial.print((uint8_t) conversionSpeeds[adc_number]);
+    Serial.print(", ADC_SAMPLING_SPEED=");
+    Serial.print((uint8_t) samplingSpeeds[adc_number]);
+    Serial.println(").");
   
     uint32_t minimum = (1 << analogReadBitDepth);    
     uint32_t maximum = 0;    
@@ -172,20 +179,23 @@ void loop() {
       }
     }
     float mean = (float) summation / nMeasurements;
-    Serial.print("range of ");
+    Serial.print("Measurement range of ");
     Serial.print(maximum - minimum);
     Serial.print(" from ");
     Serial.print(minimum);
     Serial.print(" to ");
-    Serial.println(maximum);
+    Serial.print(maximum);
+    Serial.println('.');
+
+    Serial.println("[bin]      count     percent of total measurements");
     
     float sumofsquares = 0;  
     for( uint32_t i=minimum; i<= maximum; i++) {
       float differenceFromMean = (float) i - mean;
       sumofsquares += (float) measurementHistogram[i] * (differenceFromMean * differenceFromMean);
-      Serial.print("bin[");
+      Serial.print("[");
       Serial.print(i);
-      Serial.print("] = ");
+      Serial.print("]: ");
       printRightJustifiedUnsignedInt(measurementHistogram[i]);
       float percentOfTotal = (float) measurementHistogram[i] * 100.0f / nMeasurements;
       Serial.print(' ');
@@ -196,7 +206,7 @@ void loop() {
       Serial.print(percentOfTotal);
       Serial.println('%');
     }
-    Serial.println("normalized scale:       0%       10%       20%       30%       40%       50%       60%       70%       80%       90%      100%");
+    Serial.println("normalized scale: 0%       10%       20%       30%       40%       50%       60%       70%       80%       90%      100%");
     
     Serial.print("mean:   ");
     Serial.println(mean, 6);
