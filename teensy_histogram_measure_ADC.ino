@@ -22,6 +22,7 @@ void setup() {
   analogReadResolution(analogReadBitDepth);
   analogReadAveraging(analogReadAveragingNum);
 
+  pinMode(analogReadPin, INPUT);
   pinMode(interruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interruptPin), interruptPressed, FALLING);
   
