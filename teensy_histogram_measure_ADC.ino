@@ -65,7 +65,7 @@ uint32_t measurmentHistogram[analogReadMax];
 uint32_t runNumber = 0;
 uint32_t minimum;
 uint32_t maximum;
-uint32_t nMeasurements;
+uint64_t nMeasurements;
 uint32_t measurement;
 uint32_t millisStartTimestamp;
 volatile uint32_t nMeasurementsPerPrintFrame;
