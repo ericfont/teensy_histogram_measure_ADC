@@ -68,14 +68,13 @@ uint32_t maximum;
 uint32_t nMeasurements;
 uint32_t measurement;
 uint32_t millisStartTimestamp;
-uint64_t summation;
+volatile uint32_t nMeasurementsPerPrintFrame;
 
 void loop() {
 
   if (triggerReset) {
     triggerReset = false;
     
-    summation = 0;
     minimum = (1 << analogReadBitDepth);
     maximum = 0;
     nMeasurements = 0;
@@ -89,24 +88,17 @@ void loop() {
     millisStartTimestamp = millis();
   }
 
-  uint32_t microsStartPrintFrame = micros();
-  uint32_t nMeasurementsPerPrintFrame = 1000;
-
-  // take measurements for a while
-  for( uint32_t i=0; i<nMeasurementsPerPrintFrame; i++ ) {
-    measurement = adc->adc0->analogRead(analogReadPin);
-    summation += measurement;
-    measurmentHistogram[measurement] += 1;
-    
-    if( measurement < minimum )
-      minimum = measurement;
-      
-    if( measurement > maximum )
-      maximum = measurement;
-  }
-  nMeasurements += nMeasurementsPerPrintFrame;
+  nMeasurementsPerPrintFrame = 0;
+  uint32_t microsPrintFrameStartTime = micros();
+  adc->adc0->enableInterrupts(adc0_isr);
+  adc->adc0->startContinuous(analogReadPin);
   
-  uint32_t microsPrintFrameDuration = micros() - microsStartPrintFrame;
+  delay (250); // take measurements for a while
+  
+  adc->adc0->stopContinuous();
+  adc->adc0->disableInterrupts();
+  nMeasurements += nMeasurementsPerPrintFrame;  
+  uint32_t microsPrintFrameDuration = micros() - microsPrintFrameStartTime;
 
   // end of taking measurements, now time to print summary statistics
   Serial.print("run #");
@@ -120,9 +112,28 @@ void loop() {
   Serial.print(" kHz sampling rate)");
   Serial.println();
 
-  float mean = (float) summation / nMeasurements;
-  float sumofsquares = 0;
+  // calculate stats
+  uint64_t summation = 0;
+  for( uint32_t i = 0; i < analogReadMax; i++) {
+    if( measurmentHistogram[i] > 0 ) {
+      summation += measurmentHistogram[i] * i;
   
+      if( i < minimum )
+        minimum = i;
+        
+      if( i > maximum )
+        maximum = i;
+    }
+  }
+  float mean = (float) summation / nMeasurements;
+  Serial.print("range of ");
+  Serial.print(maximum - minimum);
+  Serial.print(" from ");
+  Serial.print(minimum);
+  Serial.print(" to ");
+  Serial.println(maximum);
+  
+  float sumofsquares = 0;  
   for( uint32_t i=minimum; i<= maximum; i++) {
     float differenceFromMean = (float) i - mean;
     sumofsquares += (float) measurmentHistogram[i] * (differenceFromMean * differenceFromMean);
@@ -153,7 +164,12 @@ void loop() {
   Serial.println(standardDeviation, 6);
 
   Serial.println();
-  Serial.println();
+}
+
+void adc0_isr(void) {
+  nMeasurementsPerPrintFrame++;
+  int measurement = adc->adc0->analogReadContinuous();
+  measurmentHistogram[measurement] += 1;
 }
 
 void printRightJustifiedUnsignedInt(uint32_t value) {
