@@ -49,8 +49,8 @@ void interruptPressed() {
 }
 
 void setup() {  
-  pinMode(analogReadPin0, INPUT);
-  pinMode(analogReadPin1, INPUT);
+  pinMode(analogReadPin0, INPUT_DISABLE);
+  pinMode(analogReadPin1, INPUT_DISABLE);
   pinMode(interruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interruptPin), interruptPressed, FALLING);
   
