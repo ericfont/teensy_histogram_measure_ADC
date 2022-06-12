@@ -148,7 +148,7 @@ void loop() {
     uint32_t analogReadMax = ( (adc_number == 0) ? analogReadMax0 : analogReadMax1);
     uint32_t analogReadBitDepth = ( (adc_number == 0) ? analogReadBitDepth0 : analogReadBitDepth1);
     uint32_t analogReadAveragingNum = ( (adc_number == 0) ? analogReadAveragingNum0 : analogReadAveragingNum1);
-    float microsPerSample = (float) microsPrintFrameDuration / nMeasurementsPerPrintFrame;
+    float microsPerSample = (float) nMeasurementsPerPrintFrame / 1000000.0f;
 
     Serial.print("ADC");
     Serial.print(adc_number);
@@ -157,10 +157,8 @@ void loop() {
     Serial.print(analogReadBitDepth);
     Serial.print(", averaging=");
     Serial.print(analogReadAveragingNum);
-    Serial.print(", nMeasurements=");
-    Serial.print(nMeasurements);
     Serial.print(" @");
-    Serial.print(microsPerSample);
+    Serial.print(microsPerSample, 6);
     Serial.print(" microsPerSample or ");
     Serial.print(1000.0f / microsPerSample);
     Serial.print("kHz (ADC_CONVERSION_SPEED=");
