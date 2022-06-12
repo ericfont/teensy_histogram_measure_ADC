@@ -157,15 +157,15 @@ void loop() {
     Serial.print(analogReadBitDepth);
     Serial.print(", averaging=");
     Serial.print(analogReadAveragingNum);
-    Serial.print(" @");
-    Serial.print(microsPerSample, 6);
-    Serial.print(" microsPerSample or ");
-    Serial.print(1000.0f / microsPerSample);
-    Serial.print("kHz (ADC_CONVERSION_SPEED=");
+    Serial.print(", ADC_CONVERSION_SPEED=");
     Serial.print((uint8_t) conversionSpeeds[adc_number]);
     Serial.print(", ADC_SAMPLING_SPEED=");
     Serial.print((uint8_t) samplingSpeeds[adc_number]);
-    Serial.println(").");
+    Serial.print(", at rate of ");
+    Serial.print(microsPerSample, 6);
+    Serial.print(" microsPerSample or ");
+    Serial.print(1000.0f / microsPerSample);
+    Serial.println(" kHz.");
   
     uint32_t minimum_index = (1 << analogReadBitDepth);    
     uint32_t maximum_index = 0;
