@@ -1,4 +1,4 @@
-// test program to print a histogram of each ADC measurements for each ADC configurations.
+// test program to print a histogram of 1 second worth of measurements from each ADC, for all ADC configurations.
 // by Eric Fontaine 2021-2022 under The Unlicense (Public Domain).
 // newer version may be avilable at https://github.com/ericfont/teensy_histogram_measure_ADC
 // only tested on a Teensy 4.1 (may work on other teeny's though may need modifications)
