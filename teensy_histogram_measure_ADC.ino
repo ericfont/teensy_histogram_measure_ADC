@@ -1,7 +1,7 @@
 // test program to print a histogram of 1 second worth of measurements from each ADC, for all ADC configurations.
 // by Eric Fontaine 2021-2022 under The Unlicense (Public Domain).
-// newer version may be avilable at https://github.com/ericfont/teensy_histogram_measure_ADC
-// only tested on a Teensy 4.1 (may work on other teeny's though may need modifications)
+// newer version may be available at https://github.com/ericfont/teensy_histogram_measure_ADC
+// only tested on a Teensy 4.1 (may work on other Teensy's, though may need modifications)
 // uses https://github.com/pedvide/ADC library
 
 #include <ADC.h>
@@ -24,7 +24,7 @@ void setup() {
   Serial.begin(12000000);
 }
 
-// space to hold the historgram for each ADC. Each index represents a bin for each possible ADC converstion integer.  Max ADC bits is 12, so reserve space for 2^12 bins.
+// space to hold the historgram for each ADC. Each index represents a bin for each possible ADC result.  Max ADC bits is 12, so reserve space for 2^12 bins.
 volatile uint32_t measurementHistogram[nADCs][4096];
 
 uint32_t runNumber = 0;
